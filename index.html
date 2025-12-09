@@ -1,0 +1,1630 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>TOA Spine Exporter - Fairlyoddity</title>
+
+    <!-- Spine WebGL Runtime (IIFE build) -->
+    <script src="https://unpkg.com/@esotericsoftware/spine-webgl@4.2.*/dist/iife/spine-webgl.min.js"></script>
+    <!-- Local GIF.js for GIF export (place gif.js next to this HTML file) -->
+    <script src="./gif.js"></script>
+
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: #111;
+        width: 100%;
+        height: 100%;
+        font-family: sans-serif;
+      }
+
+      /* Left panel: skeleton list + detail */
+      #animation-panel {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 380px;
+        height: 100vh;
+        overflow-y: auto;
+        background: #1a1a1a;
+        padding: 10px;
+        box-sizing: border-box;
+        color: white;
+        border-right: 2px solid #333;
+        font-size: 13px;
+      }
+
+      #animation-panel h3 {
+        margin: 8px 0 4px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #bbb;
+      }
+
+      .skeleton-card {
+        border: 1px solid #333;
+        border-radius: 4px;
+        padding: 6px;
+        margin-bottom: 6px;
+        background: #141414;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .skeleton-card.loaded {
+        border-color: #4caf50;
+      }
+
+      .skeleton-name {
+        font-weight: 600;
+        font-size: 12px;
+      }
+
+      .load-btn {
+        padding: 3px 6px;
+        font-size: 11px;
+        border-radius: 3px;
+        border: none;
+        background: #444;
+        color: #eee;
+        cursor: pointer;
+      }
+
+      .load-btn:hover {
+        background: #666;
+      }
+
+      .field-label {
+        font-size: 11px;
+        color: #aaa;
+        margin-top: 6px;
+        margin-bottom: 2px;
+      }
+
+      .checklist {
+        max-height: 140px;
+        overflow-y: auto;
+        font-size: 11px;
+        border-radius: 3px;
+        background: #1f1f1f;
+        padding: 4px;
+        border: 1px solid #333;
+      }
+
+      .check-item {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 2px;
+        white-space: nowrap;
+      }
+
+      .check-item input[type="checkbox"] {
+        margin: 0;
+      }
+
+      .search-input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 3px 5px;
+        margin-bottom: 4px;
+        border-radius: 3px;
+        border: 1px solid #333;
+        background: #111;
+        color: #eee;
+        font-size: 11px;
+      }
+
+      .search-input::placeholder {
+        color: #666;
+      }
+
+      /* Skeleton list view vs detail view */
+      #skeleton-list-view {
+        margin-top: 4px;
+      }
+
+      #skeleton-detail-view {
+        display: none;
+        margin-top: 4px;
+      }
+
+      .detail-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 6px;
+      }
+
+      .detail-back-btn {
+        padding: 2px 6px;
+        font-size: 10px;
+        border-radius: 999px;
+        border: 1px solid #333;
+        background: #202020;
+        color: #eee;
+        cursor: pointer;
+      }
+
+      .detail-back-btn:hover {
+        background: #333;
+      }
+
+      .detail-title {
+        font-size: 12px;
+        font-weight: 600;
+        margin-left: 6px;
+        flex: 1;
+      }
+
+      .detail-reload-btn {
+        padding: 2px 6px;
+        font-size: 10px;
+        border-radius: 3px;
+        border: 1px solid #444;
+        background: #303030;
+        color: #eee;
+        cursor: pointer;
+      }
+
+      .detail-reload-btn:hover {
+        background: #444;
+      }
+
+      /* Layers label + reset button */
+      .layers-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 6px;
+        margin-bottom: 2px;
+      }
+
+      .layers-header-row .field-label {
+        margin: 0;
+      }
+
+      .layer-reset-btn {
+        padding: 1px 8px;
+        font-size: 10px;
+        border-radius: 999px;
+        border: 1px solid #444;
+        background: #252525;
+        color: #eee;
+        cursor: pointer;
+      }
+
+      .layer-reset-btn:hover {
+        background: #3a3a3a;
+      }
+
+      /* Right: default skins options panel */
+      #options-panel {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 260px;
+        height: 100vh;
+        background: #151515;
+        padding: 10px;
+        box-sizing: border-box;
+        color: #eee;
+        border-left: 2px solid #333;
+        font-size: 12px;
+      }
+
+      #options-panel h3 {
+        margin: 8px 0;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #bbb;
+      }
+
+      .option-group {
+        margin-bottom: 10px;
+      }
+
+      .option-label {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #aaa;
+        margin-bottom: 2px;
+      }
+
+      #options-panel select {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 3px 5px;
+        border-radius: 4px;
+        background: #202020;
+        border: 1px solid #333;
+        color: #eee;
+        font-size: 11px;
+      }
+
+      #options-panel small {
+        display: block;
+        color: #666;
+        font-size: 10px;
+        margin-top: 4px;
+      }
+
+      /* Center: canvas between left and right panels */
+      #spine-canvas {
+        position: absolute;
+        left: 380px;
+        right: 260px;
+        top: 0;
+        bottom: 0;
+        display: block;
+      }
+
+      /* Bottom-center speed control */
+      #speed-panel {
+        position: fixed;
+        bottom: 16px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 14px;
+        background: rgba(15, 15, 15, 0.95);
+        border-radius: 999px;
+        border: 1px solid #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #eee;
+        font-size: 11px;
+        z-index: 20;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+
+      #speed-panel label {
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 10px;
+        color: #aaa;
+      }
+
+      #speed-slider {
+        width: 200px;
+        accent-color: #4caf50;
+      }
+
+      #speed-value {
+        min-width: 40px;
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+        color: #ddd;
+      }
+
+      /* Export buttons: stacked just above speed panel, centered */
+      #export-panel {
+        position: fixed;
+        bottom: 52px; /* above speed panel */
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 8px 12px;
+        background: rgba(15, 15, 15, 0.95);
+        border-radius: 999px;
+        border: 1px solid #333;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: #eee;
+        font-size: 11px;
+        z-index: 20;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      }
+
+      #export-panel button {
+        padding: 4px 10px;
+        font-size: 11px;
+        border-radius: 999px;
+        border: 1px solid #444;
+        background: #202020;
+        color: #eee;
+        cursor: pointer;
+      }
+
+      #export-panel button:hover {
+        background: #333;
+      }
+
+      #gif-status {
+        font-size: 10px;
+        color: #bbb;
+        white-space: nowrap;
+        margin-left: 4px;
+      }
+
+      /* Small debug overlay */
+      #debug-overlay {
+        /* Uncomment to show */
+        visibility: hidden;
+        position: fixed;
+        bottom: 12px;
+        left: 12px;
+        width: 260px;
+        max-height: 40vh;
+        padding: 6px 8px;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 8px;
+        border: 1px solid #333;
+        color: #ddd;
+        font-size: 10px;
+        line-height: 1.3;
+        z-index: 30;
+        overflow-y: auto;
+        pointer-events: none; /* don't block clicks on canvas/buttons */
+      }
+
+      #debug-overlay h4 {
+        margin: 0 0 4px 0;
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: #aaa;
+      }
+
+      #debug-overlay .debug-section-title {
+        margin-top: 4px;
+        font-weight: 600;
+        color: #aaa;
+      }
+
+      #debug-overlay .debug-line {
+        white-space: nowrap;
+      }
+    </style>
+  </head>
+
+  <body>
+    <!-- Left panel -->
+    <div id="animation-panel">
+      <h3>Skeletons</h3>
+
+      <!-- Skeleton list view -->
+      <div id="skeleton-list-view">
+        <input
+          id="skeleton-search"
+          class="search-input"
+          type="text"
+          placeholder="Search skeletons..."
+        />
+        <div id="skeleton-list"></div>
+      </div>
+
+      <!-- Skeleton detail view (for a single loaded skeleton) -->
+      <div id="skeleton-detail-view">
+        <div class="detail-header">
+          <button id="detail-back-btn" class="detail-back-btn">← Back</button>
+          <div id="detail-skeleton-name" class="detail-title"></div>
+          <button id="detail-reload-btn" class="detail-reload-btn">
+            Reload
+          </button>
+        </div>
+
+        <!-- Animations -->
+        <div>
+          <div class="field-label">Animations:</div>
+          <input
+            id="detail-anim-search"
+            class="search-input"
+            type="text"
+            placeholder="Search animations..."
+          />
+          <div id="detail-anim-list" class="checklist">(not loaded yet)</div>
+        </div>
+
+        <!-- Skins -->
+        <div>
+          <div class="field-label">Skins:</div>
+          <input
+            id="detail-skin-search"
+            class="search-input"
+            type="text"
+            placeholder="Search skins..."
+          />
+          <div id="detail-skin-list" class="checklist">(not loaded yet)</div>
+        </div>
+
+        <!-- Layers (slots) -->
+        <div>
+          <div class="layers-header-row">
+            <div class="field-label">Layers (slots visibility):</div>
+            <button id="detail-layer-reset-btn" class="layer-reset-btn">
+              Reset
+            </button>
+          </div>
+          <input
+            id="detail-layer-search"
+            class="search-input"
+            type="text"
+            placeholder="Search layers..."
+          />
+          <div id="detail-layer-list" class="checklist">(not loaded yet)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Default skin options sidebar -->
+    <div id="options-panel">
+      <h3>Default Skins</h3>
+
+      <div class="option-group">
+        <div class="option-label">Gender</div>
+        <select id="opt-gender">
+          <option value="">(None)</option>
+          <option value="Femme" selected>Femme</option>
+          <option value="Homme">Homme</option>
+        </select>
+      </div>
+
+      <div class="option-group">
+        <div class="option-label">Skin</div>
+        <select id="opt-skin">
+          <option value="">(None)</option>
+          <option value="Skin Light" selected>Skin Light</option>
+          <option value="Skin Dark">Skin Dark</option>
+          <option value="Skin Elf">Skin Elf</option>
+          <option value="Skin Med">Skin Med</option>
+          <option value="Skin Orc">Skin Orc</option>
+        </select>
+      </div>
+
+      <div class="option-group">
+        <div class="option-label">Eyes</div>
+        <select id="opt-eyes">
+          <option value="">(None)</option>
+          <option value="Eyes Teal" selected>Eyes Teal</option>
+          <option value="Eyes Golden">Eyes Golden</option>
+          <option value="Eyes Periwinkle">Eyes Periwinkle</option>
+          <option value="Eyes Pink">Eyes Pink</option>
+        </select>
+      </div>
+
+      <div class="option-group">
+        <div class="option-label">Hair</div>
+        <select id="opt-hair">
+          <option value="">(None)</option>
+          <option value="Hair Brown" selected>Hair Brown</option>
+          <option value="Hair Black">Hair Black</option>
+          <option value="Hair Black Mix">Hair Black Mix</option>
+          <option value="Hair Deep Red">Hair Deep Red</option>
+          <option value="Hair Pink">Hair Pink</option>
+          <option value="Hair Platinum">Hair Platinum</option>
+          <option value="Hair Silver">Hair Silver</option>
+        </select>
+      </div>
+
+      <div class="option-group">
+        <div class="option-label">Makeup Level</div>
+        <select id="opt-makeup">
+          <option value="">(None)</option>
+          <option value="Makeup Level 0" selected>Makeup Level 0</option>
+          <option value="Makeup Level 1">Makeup Level 1</option>
+          <option value="Makeup Level 2">Makeup Level 2</option>
+          <option value="Makeup Level 3">Makeup Level 3</option>
+          <option value="Makeup Level 5">Makeup Level 5</option>
+        </select>
+      </div>
+
+      <div class="option-group">
+        <div class="option-label">Bunny</div>
+        <select id="opt-bunny">
+          <option value="">(None)</option>
+          <option value="Chocolate" selected>Chocolate</option>
+          <option value="Caramel">Caramel</option>
+          <option value="Cream">Cream</option>
+          <option value="Dark Chocolate">Dark Chocolate</option>
+          <option value="Vanilla">Vanilla</option>
+        </select>
+      </div>
+
+      <small>
+        These skins are auto-checked when a skeleton is loaded. You can still
+        toggle individual skins in the detail view.
+      </small>
+    </div>
+
+    <!-- Center canvas -->
+    <canvas id="spine-canvas"></canvas>
+
+    <!-- Bottom-center speed control -->
+    <div id="speed-panel">
+      <label for="speed-slider">Speed</label>
+      <input
+        id="speed-slider"
+        type="range"
+        min="0.1"
+        max="5"
+        step="0.1"
+        value="1"
+      />
+      <span id="speed-value">1.0x</span>
+    </div>
+
+    <!-- Bottom export controls (stacked above speed) -->
+    <div id="export-panel">
+      <button id="btn-download-png">Download PNG</button>
+      <button id="btn-download-gif">Download GIF loop</button>
+      <span id="gif-status">GIF: idle</span>
+    </div>
+
+    <!-- Small debug overlay -->
+    <div id="debug-overlay"></div>
+
+    <script>
+      const fs = require("fs");
+      const path = require("path");
+
+      const canvas = document.getElementById("spine-canvas");
+
+      // Offscreen capture canvas for PNG/GIF (2D context)
+      const captureCanvas = document.createElement("canvas");
+      const captureCtx = captureCanvas.getContext("2d");
+
+      // Left-panel DOM
+      const skeletonListView = document.getElementById("skeleton-list-view");
+      const skeletonDetailView = document.getElementById(
+        "skeleton-detail-view",
+      );
+      const skeletonSearchInput = document.getElementById("skeleton-search");
+      const skeletonListDiv = document.getElementById("skeleton-list");
+
+      const detailBackBtn = document.getElementById("detail-back-btn");
+      const detailReloadBtn = document.getElementById("detail-reload-btn");
+      const detailSkeletonName = document.getElementById(
+        "detail-skeleton-name",
+      );
+
+      const detailAnimSearch = document.getElementById("detail-anim-search");
+      const detailAnimList = document.getElementById("detail-anim-list");
+      const detailSkinSearch = document.getElementById("detail-skin-search");
+      const detailSkinList = document.getElementById("detail-skin-list");
+      const detailLayerSearch = document.getElementById("detail-layer-search");
+      const detailLayerList = document.getElementById("detail-layer-list");
+      const detailLayerResetBtn = document.getElementById(
+        "detail-layer-reset-btn",
+      );
+
+      // Export buttons + status
+      const btnDownloadPng = document.getElementById("btn-download-png");
+      const btnDownloadGif = document.getElementById("btn-download-gif");
+      const gifStatus = document.getElementById("gif-status");
+
+      // Right-panel selects
+      const optGender = document.getElementById("opt-gender");
+      const optSkin = document.getElementById("opt-skin");
+      const optEyes = document.getElementById("opt-eyes");
+      const optHair = document.getElementById("opt-hair");
+      const optMakeup = document.getElementById("opt-makeup");
+      const optBunny = document.getElementById("opt-bunny");
+
+      // Debug overlay
+      const debugOverlay = document.getElementById("debug-overlay");
+      const debugEvents = []; // recent animation completion events
+
+      function getSelectedDefaultSkinNames() {
+        const names = [];
+        if (optGender && optGender.value) names.push(optGender.value);
+        if (optSkin && optSkin.value) names.push(optSkin.value);
+        if (optEyes && optEyes.value) names.push(optEyes.value);
+        if (optHair && optHair.value) names.push(optHair.value);
+        if (optMakeup && optMakeup.value) names.push(optMakeup.value);
+        if (optBunny && optBunny.value) names.push(optBunny.value);
+
+        // Fallback in case user clears everything
+        if (!names.length) {
+          return [
+            "Femme",
+            "Skin Light",
+            "Eyes Teal",
+            "Hair Brown",
+            "Makeup Level 0",
+            "Chocolate",
+            "Caramel",
+            "Cream",
+            "Dark Chocolate",
+            "Vanilla",
+          ];
+        }
+
+        return names;
+      }
+
+      // Speed slider
+      const speedSlider = document.getElementById("speed-slider");
+      const speedValueSpan = document.getElementById("speed-value");
+      let speedFactor = 1.0;
+
+      speedSlider.addEventListener("input", () => {
+        speedFactor = parseFloat(speedSlider.value) || 1.0;
+        speedValueSpan.textContent = speedFactor.toFixed(1) + "x";
+      });
+
+      const PANEL_LEFT_WIDTH = 380;
+      const PANEL_RIGHT_WIDTH = 260;
+
+      function resizeCanvas() {
+        const w = window.innerWidth - PANEL_LEFT_WIDTH - PANEL_RIGHT_WIDTH;
+        const h = window.innerHeight;
+        canvas.width = w;
+        canvas.height = h;
+        captureCanvas.width = w;
+        captureCanvas.height = h;
+      }
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      const context = new spine.ManagedWebGLRenderingContext(canvas, {
+        alpha: false,
+      });
+      const gl = context.gl;
+      const renderer = new spine.SceneRenderer(canvas, context);
+      const timeKeeper = new spine.TimeKeeper();
+
+      // Skeleton entries (like project folders)
+      const skeletonEntries = [];
+      let activeEntry = null; // currently loaded/selected skeleton
+
+      // GIF recording state: driven by animation time for stop, real time for delays
+      let gifRecording = false;
+      let gifRecorder = null;
+      let gifAnimTime = 0; // accumulated animation time while recording
+      let gifRealTime = 0; // accumulated real time while recording
+      let gifLastCaptureAnimTime = 0;
+      let gifLastCaptureRealTime = 0;
+      let gifMaxAnimTime = 0; // longest selected animation duration (seconds)
+      let gifCapturedFrames = 0;
+
+      // ------------------------------
+      // Discover assets
+      // ------------------------------
+      (function discoverAssets() {
+        const assetsDir = path.join(__dirname, "assets");
+        const allFiles = fs.readdirSync(assetsDir);
+
+        const atlasFiles = allFiles.filter((f) =>
+          f.toLowerCase().endsWith(".atlas"),
+        );
+        const skelFiles = allFiles.filter((f) =>
+          f.toLowerCase().endsWith(".skel"),
+        );
+
+        function stem(f) {
+          return f.replace(/\.[^.]+$/, "");
+        }
+
+        const stems = new Set([
+          ...atlasFiles.map(stem),
+          ...skelFiles.map(stem),
+        ]);
+
+        for (const s of stems) {
+          const atlas = atlasFiles.find((f) => stem(f) === s);
+          const skel = skelFiles.find((f) => stem(f) === s);
+          if (!atlas || !skel) {
+            console.warn("Unmatched asset (missing atlas or skel) for:", s);
+            continue;
+          }
+          skeletonEntries.push({
+            name: s,
+            atlasFile: atlas,
+            skelFile: skel,
+            loaded: false,
+            assetManager: null,
+            skeletonData: null,
+            skeleton: null,
+            state: null,
+            offset: null,
+            size: null,
+            animNames: [],
+            skinNames: [],
+            slotNames: [],
+            defaultSkinName: null,
+            hiddenSlots: new Set(),
+          });
+        }
+      })();
+
+      // ------------------------------
+      // Helper: attach search to a checklist
+      // ------------------------------
+      function attachSearchFilter(inputEl, listEl) {
+        if (!inputEl || !listEl) return;
+        inputEl.addEventListener("input", () => {
+          const term = inputEl.value.toLowerCase().trim();
+          const items = listEl.querySelectorAll(".check-item");
+          items.forEach((item) => {
+            const text = item.textContent.toLowerCase();
+            item.style.display = !term || text.includes(term) ? "" : "none";
+          });
+        });
+      }
+
+      // ------------------------------
+      // Skeleton list UI
+      // ------------------------------
+      function buildSkeletonListUI() {
+        skeletonListDiv.innerHTML = "";
+        skeletonEntries.forEach((entry, index) => {
+          const card = document.createElement("div");
+          card.className = "skeleton-card";
+          card.dataset.index = index.toString();
+          card.dataset.name = entry.name.toLowerCase();
+
+          const nameSpan = document.createElement("span");
+          nameSpan.className = "skeleton-name";
+          nameSpan.textContent = entry.name;
+
+          const loadBtn = document.createElement("button");
+          loadBtn.className = "load-btn";
+          loadBtn.textContent = "Load";
+          loadBtn.onclick = async () => {
+            await handleLoadSkeleton(entry);
+          };
+
+          card.appendChild(nameSpan);
+          card.appendChild(loadBtn);
+          skeletonListDiv.appendChild(card);
+        });
+      }
+
+      // Skeleton search
+      skeletonSearchInput.addEventListener("input", () => {
+        const term = skeletonSearchInput.value.toLowerCase().trim();
+        const cards = skeletonListDiv.querySelectorAll(".skeleton-card");
+        cards.forEach((card) => {
+          const name = card.dataset.name || "";
+          card.style.display = !term || name.includes(term) ? "" : "none";
+        });
+      });
+
+      // ------------------------------
+      // Skin / anim / layer helpers
+      // ------------------------------
+      function addSkinIfExists(data, combined, name) {
+        if (!name) return;
+        const skin = data.findSkin(name);
+        if (skin) combined.addSkin(skin);
+      }
+
+      function unloadAllSkeletonsExcept(entryToKeep) {
+        for (const entry of skeletonEntries) {
+          if (entry !== entryToKeep && entry.loaded) {
+            entry.loaded = false;
+            entry.assetManager = null;
+            entry.skeletonData = null;
+            entry.skeleton = null;
+            entry.state = null;
+            entry.offset = null;
+            entry.size = null;
+            entry.animNames = [];
+            entry.skinNames = [];
+            entry.slotNames = [];
+            entry.defaultSkinName = null;
+            entry.hiddenSlots = new Set();
+          }
+        }
+      }
+
+      function updateEntrySkins(entry) {
+        if (
+          !entry.loaded ||
+          !entry.skeleton ||
+          !entry.skeletonData ||
+          !detailSkinList
+        )
+          return;
+
+        const data = entry.skeletonData;
+        const combined = new spine.Skin("combined");
+        const defaultName = entry.defaultSkinName;
+
+        const checkboxes = detailSkinList.querySelectorAll(
+          'input[type="checkbox"]',
+        );
+        checkboxes.forEach((cb) => {
+          if (!cb.checked) return;
+          const skinName = cb.dataset.skinName;
+          if (skinName === defaultName && data.defaultSkin) {
+            combined.addSkin(data.defaultSkin);
+          } else {
+            addSkinIfExists(data, combined, skinName);
+          }
+        });
+
+        entry.skeleton.setSkin(combined);
+        entry.skeleton.setSlotsToSetupPose();
+      }
+
+      function updateEntryAnimations(entry) {
+        if (
+          !entry.loaded ||
+          !entry.state ||
+          !entry.skeletonData ||
+          !detailAnimList
+        )
+          return;
+
+        const checkboxes = detailAnimList.querySelectorAll(
+          'input[type="checkbox"]',
+        );
+        const selected = [];
+        checkboxes.forEach((cb) => {
+          if (cb.checked) selected.push(cb.dataset.animName);
+        });
+
+        entry.state.clearTracks();
+
+        if (selected.length === 0) {
+          entry.skeleton.setToSetupPose();
+          entry.skeleton.updateWorldTransform(spine.Physics.reset);
+          return;
+        }
+
+        let trackIndex = 0;
+        for (const name of selected) {
+          if (entry.skeletonData.findAnimation(name)) {
+            entry.state.setAnimation(trackIndex++, name, true);
+          }
+        }
+      }
+
+      function updateEntryLayers(entry) {
+        if (!entry.loaded || !entry.skeleton || !detailLayerList) return;
+
+        const hidden = new Set();
+        const checkboxes = detailLayerList.querySelectorAll(
+          'input[type="checkbox"]',
+        );
+        checkboxes.forEach((cb) => {
+          const slotName = cb.dataset.slotName;
+          if (!cb.checked && slotName) hidden.add(slotName);
+        });
+
+        entry.hiddenSlots = hidden;
+      }
+
+      // Reset layers: show everything again
+      function resetLayersToDefault(entry) {
+        if (!detailLayerList) return;
+        const checkboxes = detailLayerList.querySelectorAll(
+          'input[type="checkbox"]',
+        );
+        checkboxes.forEach((cb) => {
+          cb.checked = true;
+        });
+        entry.hiddenSlots = new Set();
+      }
+
+      // Wire reset button
+      detailLayerResetBtn.addEventListener("click", () => {
+        if (!activeEntry) return;
+        resetLayersToDefault(activeEntry);
+      });
+
+      // ------------------------------
+      // Build only the skins checklist for an entry
+      // ------------------------------
+      function buildSkinChecklist(entry) {
+        if (!detailSkinList) return;
+
+        detailSkinList.innerHTML = "";
+        if (!entry.skinNames.length) {
+          detailSkinList.textContent = "(no skins)";
+        } else {
+          const globalDefaults = getSelectedDefaultSkinNames();
+
+          entry.skinNames.forEach((name) => {
+            const row = document.createElement("label");
+            row.className = "check-item";
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.dataset.skinName = name;
+
+            const isDefault =
+              entry.defaultSkinName && name === entry.defaultSkinName;
+            const isGlobalDefault = globalDefaults.includes(name);
+
+            if (isDefault || isGlobalDefault) {
+              cb.checked = true;
+            }
+
+            cb.onchange = () => updateEntrySkins(entry);
+            row.appendChild(cb);
+            row.appendChild(document.createTextNode(name));
+            detailSkinList.appendChild(row);
+          });
+        }
+
+        detailSkinSearch.value = "";
+      }
+
+      // ------------------------------
+      // Build detail view for active skeleton
+      // ------------------------------
+      function populateDetailView(entry) {
+        if (!entry) return;
+
+        detailSkeletonName.textContent = entry.name;
+
+        // Animations
+        detailAnimList.innerHTML = "";
+        if (!entry.animNames.length) {
+          detailAnimList.textContent = "(no animations)";
+        } else {
+          entry.animNames.forEach((name) => {
+            const row = document.createElement("label");
+            row.className = "check-item";
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.dataset.animName = name;
+            cb.onchange = () => updateEntryAnimations(entry);
+            row.appendChild(cb);
+            row.appendChild(document.createTextNode(name));
+            detailAnimList.appendChild(row);
+          });
+        }
+        detailAnimSearch.value = "";
+        attachSearchFilter(detailAnimSearch, detailAnimList);
+
+        // Skins (via helper)
+        buildSkinChecklist(entry);
+        attachSearchFilter(detailSkinSearch, detailSkinList);
+
+        // Layers (slots)
+        detailLayerList.innerHTML = "";
+        if (!entry.slotNames.length) {
+          detailLayerList.textContent = "(no slots)";
+        } else {
+          entry.slotNames.forEach((name) => {
+            const row = document.createElement("label");
+            row.className = "check-item";
+            const cb = document.createElement("input");
+            cb.type = "checkbox";
+            cb.dataset.slotName = name;
+            cb.checked = !entry.hiddenSlots.has(name);
+            cb.onchange = () => updateEntryLayers(entry);
+            row.appendChild(cb);
+            row.appendChild(document.createTextNode(name));
+            detailLayerList.appendChild(row);
+          });
+        }
+        detailLayerSearch.value = "";
+        attachSearchFilter(detailLayerSearch, detailLayerList);
+
+        // Apply initial skins/animations
+        updateEntrySkins(entry);
+        updateEntryAnimations(entry);
+      }
+
+      // ------------------------------
+      // Live-refresh skins when defaults change
+      // ------------------------------
+      function refreshDefaultSkinsIfActive() {
+        if (!activeEntry) return;
+        buildSkinChecklist(activeEntry);
+        attachSearchFilter(detailSkinSearch, detailSkinList);
+        updateEntrySkins(activeEntry);
+      }
+
+      [optGender, optSkin, optEyes, optHair, optMakeup, optBunny].forEach(
+        (sel) => {
+          if (!sel) return;
+          sel.addEventListener("change", refreshDefaultSkinsIfActive);
+        },
+      );
+
+      // ------------------------------
+      // Export: PNG of current frame (from captureCanvas)
+      // ------------------------------
+      function downloadCurrentFramePNG() {
+        captureCanvas.toBlob(
+          (blob) => {
+            if (!blob) return;
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const ts = new Date().toISOString().replace(/[:.]/g, "-");
+            a.href = url;
+            a.download = "spine-frame-" + ts + ".png";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+          },
+          "image/png",
+          1.0,
+        );
+      }
+
+      btnDownloadPng.addEventListener("click", downloadCurrentFramePNG);
+
+      // ------------------------------
+      // Export: GIF of current loop (frames from captureCanvas)
+      // ------------------------------
+      function computeLoopDurationSeconds(entry) {
+        if (!entry || !entry.skeletonData || !detailAnimList) return 0;
+        const checkboxes = detailAnimList.querySelectorAll(
+          'input[type="checkbox"]',
+        );
+        let maxDur = 0;
+        checkboxes.forEach((cb) => {
+          if (!cb.checked) return;
+          const animName = cb.dataset.animName;
+          const anim = entry.skeletonData.findAnimation(animName);
+          if (anim && anim.duration > maxDur) maxDur = anim.duration;
+        });
+        return maxDur > 0 ? maxDur : 0;
+      }
+
+      // Start GIF recording: stop after longest selected animation (in anim time),
+      // but use *real time* between captured frames as GIF delay.
+      function downloadGifLoop() {
+        if (!activeEntry || !activeEntry.loaded) {
+          alert("Load a skeleton and select at least one animation first.");
+          return;
+        }
+
+        const baseDurationSec = computeLoopDurationSeconds(activeEntry) || 2;
+        const effectiveSpeed = Math.max(speedFactor || 1, 0.001);
+
+        // We'll stop once we've advanced this much *animation* time.
+        gifMaxAnimTime = baseDurationSec;
+        gifAnimTime = 0;
+        gifRealTime = 0;
+        gifLastCaptureAnimTime = 0;
+        gifLastCaptureRealTime = 0;
+        gifCapturedFrames = 0;
+
+        // Collect selected animations
+        const selectedAnimNames = [];
+        const animCheckboxes = detailAnimList.querySelectorAll(
+          'input[type="checkbox"]',
+        );
+        animCheckboxes.forEach((cb) => {
+          if (cb.checked && cb.dataset.animName) {
+            selectedAnimNames.push(cb.dataset.animName);
+          }
+        });
+
+        if (!selectedAnimNames.length) {
+          alert("Select at least one animation in the detail view first.");
+          return;
+        }
+
+        // Reset skeleton & animations to time 0
+        activeEntry.state.clearTracks();
+        activeEntry.skeleton.setToSetupPose();
+        activeEntry.skeleton.updateWorldTransform(spine.Physics.reset);
+
+        let trackIndex = 0;
+        for (const name of selectedAnimNames) {
+          if (activeEntry.skeletonData.findAnimation(name)) {
+            activeEntry.state.setAnimation(trackIndex++, name, true);
+          }
+        }
+
+        if (typeof GIF === "undefined") {
+          alert("GIF.js library not loaded; cannot export GIF.");
+          if (gifStatus) gifStatus.textContent = "GIF: error (no GIF.js)";
+          return;
+        }
+
+        gifRecorder = new GIF({
+          workers: 2,
+          quality: 10,
+          workerScript: "./gif.worker.js",
+        });
+
+        gifRecorder.on("progress", function (p) {
+          if (gifStatus && gifRecording) {
+            const pct = Math.round(p * 100);
+            gifStatus.textContent =
+              "GIF: rendering... " +
+              pct +
+              "% (" +
+              gifCapturedFrames +
+              " frames)";
+          }
+        });
+
+        gifRecorder.on("finished", function (blob) {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          const ts = new Date().toISOString().replace(/[:.]/g, "-");
+          a.href = url;
+          a.download = "spine-loop-" + ts + ".gif";
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          gifRecording = false;
+          if (gifStatus)
+            gifStatus.textContent =
+              "GIF: done (" + gifCapturedFrames + " frames)";
+        });
+
+        gifRecording = true;
+
+        const visualLoopSec = baseDurationSec / effectiveSpeed;
+        if (gifStatus) {
+          gifStatus.textContent =
+            "GIF: recording (anim " +
+            baseDurationSec.toFixed(2) +
+            "s; visual ~" +
+            visualLoopSec.toFixed(2) +
+            "s @ " +
+            effectiveSpeed.toFixed(1) +
+            "x)";
+        }
+
+        // Safety timeout in case workers hang
+        const RENDER_TIMEOUT_MS = 30000;
+        setTimeout(() => {
+          if (gifRecording) {
+            gifRecording = false;
+            if (gifStatus)
+              gifStatus.textContent =
+                "GIF: error (render timeout, worker likely blocked)";
+          }
+        }, RENDER_TIMEOUT_MS);
+      }
+
+      btnDownloadGif.addEventListener("click", downloadGifLoop);
+
+      // ------------------------------
+      // Load skeleton into Spine (with debug listeners)
+      // ------------------------------
+      async function loadSkeletonEntry(entry) {
+        entry.assetManager = new spine.AssetManager(context, "./assets/");
+        entry.assetManager.loadTextureAtlas(entry.atlasFile);
+        entry.assetManager.loadBinary(entry.skelFile);
+
+        await waitForAssets(entry.assetManager);
+
+        const atlas = entry.assetManager.require(entry.atlasFile);
+        const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
+        const binary = new spine.SkeletonBinary(atlasLoader);
+        const skeletonData = binary.readSkeletonData(
+          entry.assetManager.require(entry.skelFile),
+        );
+
+        entry.skeletonData = skeletonData;
+
+        const skeleton = new spine.Skeleton(skeletonData);
+        skeleton.setToSetupPose();
+        skeleton.updateWorldTransform(spine.Physics.reset);
+
+        const offset = new spine.Vector2();
+        const size = new spine.Vector2();
+        skeleton.getBounds(offset, size, []);
+
+        const stateData = new spine.AnimationStateData(skeleton.data);
+        const state = new spine.AnimationState(stateData);
+
+        // Debug: track all completes on all tracks
+        state.addListener({
+          complete: (trackEntry) => {
+            if (!trackEntry || !trackEntry.animation) return;
+            const animName = trackEntry.animation.name;
+            const trackIndex = trackEntry.trackIndex;
+            const now = new Date();
+
+            console.log(
+              `[DEBUG] Animation complete: skeleton=${entry.name}, track=${trackIndex}, anim=${animName}`,
+            );
+
+            debugEvents.push({
+              time: now,
+              skeleton: entry.name,
+              trackIndex,
+              animation: animName,
+            });
+            if (debugEvents.length > 10) debugEvents.shift();
+          },
+        });
+
+        entry.skeleton = skeleton;
+        entry.state = state;
+        entry.offset = offset;
+        entry.size = size;
+        entry.animNames = skeletonData.animations.map((a) => a.name);
+        entry.skinNames = skeletonData.skins.map((s) => s.name);
+        entry.slotNames = skeletonData.slots.map((s) => s.name);
+        entry.defaultSkinName = skeletonData.defaultSkin
+          ? skeletonData.defaultSkin.name
+          : null;
+        entry.hiddenSlots = new Set();
+        entry.loaded = true;
+
+        console.log(
+          "Loaded " + entry.name,
+          "Animations:",
+          entry.animNames,
+          "Skins:",
+          entry.skinNames,
+          "Slots:",
+          entry.slotNames,
+          "Default skin:",
+          entry.defaultSkinName,
+        );
+      }
+
+      function waitForAssets(manager) {
+        return new Promise((resolve) => {
+          function loop() {
+            if (manager.isLoadingComplete()) resolve();
+            else requestAnimationFrame(loop);
+          }
+          loop();
+        });
+      }
+
+      // ------------------------------
+      // Visible-only bounds per entry
+      // ------------------------------
+      function computeEntryBounds(entry) {
+        const skeleton = entry.skeleton;
+        if (!skeleton) return false;
+
+        const hidden = entry.hiddenSlots || new Set();
+        const drawOrder = skeleton.drawOrder;
+        const worldVertices = [];
+
+        let minX = Infinity;
+        let minY = Infinity;
+        let maxX = -Infinity;
+        let maxY = -Infinity;
+
+        for (let i = 0; i < drawOrder.length; i++) {
+          const slot = drawOrder[i];
+          const slotName = slot.data && slot.data.name;
+          if (slotName && hidden.has(slotName)) continue;
+
+          const attachment = slot.getAttachment();
+          if (!attachment) continue;
+
+          if (attachment instanceof spine.RegionAttachment) {
+            worldVertices.length = 8;
+            attachment.computeWorldVertices(slot, worldVertices, 0, 2);
+            for (let v = 0; v < 8; v += 2) {
+              const x = worldVertices[v];
+              const y = worldVertices[v + 1];
+              if (!isFinite(x) || !isFinite(y)) continue;
+              if (x < minX) minX = x;
+              if (y < minY) minY = y;
+              if (x > maxX) maxX = x;
+              if (y > maxY) maxY = y;
+            }
+          } else if (attachment instanceof spine.MeshAttachment) {
+            const len = attachment.worldVerticesLength;
+            if (worldVertices.length < len) worldVertices.length = len;
+            attachment.computeWorldVertices(slot, 0, len, worldVertices, 0, 2);
+            for (let v = 0; v < len; v += 2) {
+              const x = worldVertices[v];
+              const y = worldVertices[v + 1];
+              if (!isFinite(x) || !isFinite(y)) continue;
+              if (x < minX) minX = x;
+              if (y < minY) minY = y;
+              if (x > maxX) maxX = x;
+              if (y > maxY) maxY = y;
+            }
+          }
+        }
+
+        if (
+          !isFinite(minX) ||
+          !isFinite(minY) ||
+          !isFinite(maxX) ||
+          !isFinite(maxY)
+        ) {
+          if (!entry.offset) entry.offset = new spine.Vector2();
+          if (!entry.size) entry.size = new spine.Vector2();
+          entry.offset.x = 0;
+          entry.offset.y = 0;
+          entry.size.x = 0;
+          entry.size.y = 0;
+          return false;
+        }
+
+        if (!entry.offset) entry.offset = new spine.Vector2();
+        if (!entry.size) entry.size = new spine.Vector2();
+
+        entry.offset.x = minX;
+        entry.offset.y = minY;
+        entry.size.x = maxX - minX;
+        entry.size.y = maxY - minY;
+
+        return true;
+      }
+
+      // ------------------------------
+      // Debug overlay updater
+      // ------------------------------
+      function updateDebugOverlay() {
+        if (!debugOverlay) return;
+
+        let html = "<h4>Spine Debug</h4>";
+
+        html += '<div class="debug-section-title">Active tracks</div>';
+
+        let anyTracks = false;
+
+        for (const entry of skeletonEntries) {
+          if (!entry.loaded || !entry.state) continue;
+
+          const tracks = entry.state.tracks || [];
+          for (let i = 0; i < tracks.length; i++) {
+            const t = tracks[i];
+            if (!t || !t.animation) continue;
+            anyTracks = true;
+
+            const animName = t.animation.name;
+            const duration = t.animation.duration || 0;
+            const trackTime = t.trackTime || 0;
+            const currentTime = duration > 0 ? trackTime % duration : trackTime;
+            const progress = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+            html +=
+              '<div class="debug-line">' +
+              entry.name +
+              " [T" +
+              i +
+              "] " +
+              animName +
+              ": " +
+              currentTime.toFixed(2) +
+              " / " +
+              duration.toFixed(2) +
+              "s (" +
+              progress.toFixed(0) +
+              "%)</div>";
+          }
+        }
+
+        if (!anyTracks) {
+          html += '<div class="debug-line">No active tracks</div>';
+        }
+
+        html += '<div class="debug-section-title">Recent completes</div>';
+
+        if (!debugEvents.length) {
+          html += '<div class="debug-line">None yet</div>';
+        } else {
+          for (let i = debugEvents.length - 1; i >= 0; i--) {
+            const ev = debugEvents[i];
+            const timeStr = ev.time.toTimeString().split(" ")[0]; // HH:MM:SS
+            html +=
+              '<div class="debug-line">' +
+              timeStr +
+              " " +
+              ev.skeleton +
+              " [T" +
+              ev.trackIndex +
+              "]: " +
+              ev.animation +
+              "</div>";
+          }
+        }
+
+        debugOverlay.innerHTML = html;
+      }
+
+      // ------------------------------
+      // Render loop
+      // ------------------------------
+      function render() {
+        timeKeeper.update();
+        const baseDelta = timeKeeper.delta; // real-time seconds
+        const delta = baseDelta * speedFactor; // animation-time delta
+
+        // Track both animation time & real time while GIF is recording
+        if (gifRecording) {
+          gifAnimTime += delta;
+          gifRealTime += baseDelta;
+        }
+
+        let minX = Infinity,
+          minY = Infinity,
+          maxX = -Infinity,
+          maxY = -Infinity;
+
+        for (const entry of skeletonEntries) {
+          if (!entry.loaded || !entry.state || !entry.skeleton) continue;
+
+          entry.state.update(delta);
+          entry.state.apply(entry.skeleton);
+
+          const hidden = entry.hiddenSlots || new Set();
+          const slots = entry.skeleton.slots;
+
+          // 1) Restore alpha for non-hidden slots that we might have zeroed
+          for (let i = 0; i < slots.length; i++) {
+            const slot = slots[i];
+            const slotName = slot.data && slot.data.name;
+            const isHidden = slotName && hidden.has(slotName);
+            if (!isHidden && slot.color.a === 0) {
+              const dataColor = slot.data && slot.data.color;
+              slot.color.a = dataColor ? dataColor.a : 1;
+            }
+          }
+
+          // 2) Force alpha = 0 for currently hidden slots
+          if (hidden.size > 0) {
+            for (let i = 0; i < slots.length; i++) {
+              const slot = slots[i];
+              const slotName = slot.data && slot.data.name;
+              if (slotName && hidden.has(slotName)) {
+                slot.color.a = 0;
+              }
+            }
+          }
+
+          entry.skeleton.updateWorldTransform(spine.Physics.update);
+
+          const hasBounds = computeEntryBounds(entry);
+          if (!hasBounds) continue;
+
+          const o = entry.offset;
+          const s = entry.size;
+          if (
+            !o ||
+            !s ||
+            !isFinite(o.x) ||
+            !isFinite(o.y) ||
+            !isFinite(s.x) ||
+            !isFinite(s.y)
+          )
+            continue;
+
+          minX = Math.min(minX, o.x);
+          minY = Math.min(minY, o.y);
+          maxX = Math.max(maxX, o.x + s.x);
+          maxY = Math.max(maxY, o.y + s.y);
+        }
+
+        resizeCanvas();
+
+        if (!isFinite(minX) || !isFinite(minY)) {
+          gl.clearColor(0.07, 0.07, 0.07, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+
+          // Update debug overlay even if nothing is drawn
+          updateDebugOverlay();
+          requestAnimationFrame(render);
+          return;
+        }
+
+        const totalWidth = maxX - minX || 1;
+        const totalHeight = maxY - minY || 1;
+
+        const targetW = canvas.width;
+        const targetH = canvas.height;
+
+        const scaleX = targetW / totalWidth;
+        const scaleY = targetH / totalHeight;
+        const scale = Math.min(scaleX, scaleY);
+
+        renderer.camera.zoom = 1 / scale;
+        renderer.camera.position.x = (minX + maxX) / 2;
+        renderer.camera.position.y = (minY + maxY) / 2;
+        renderer.camera.viewportWidth = targetW;
+        renderer.camera.viewportHeight = targetH;
+
+        renderer.resize(spine.ResizeMode.Expand);
+
+        gl.clearColor(0.07, 0.07, 0.07, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        renderer.begin();
+        for (const entry of skeletonEntries) {
+          if (!entry.loaded || !entry.skeleton) continue;
+          renderer.drawSkeleton(entry.skeleton, true);
+        }
+        renderer.end();
+
+        // Copy the current WebGL frame into the 2D capture canvas
+        captureCtx.clearRect(0, 0, captureCanvas.width, captureCanvas.height);
+        captureCtx.drawImage(
+          canvas,
+          0,
+          0,
+          captureCanvas.width,
+          captureCanvas.height,
+        );
+
+        // GIF capture: animation-time based stop, real-time delay per frame
+        if (gifRecording && gifRecorder) {
+          const elapsedRealMs = (gifRealTime - gifLastCaptureRealTime) * 1000;
+
+          const MIN_DELAY_MS = 20; // ~50 fps max
+          const MAX_DELAY_MS = 200; // ~5 fps min
+
+          let shouldAdd = false;
+          let delayMs = 0;
+
+          if (gifAnimTime >= gifMaxAnimTime) {
+            // Ensure a final frame at/after the end
+            let d = elapsedRealMs;
+            if (!isFinite(d) || d <= 0) d = MIN_DELAY_MS;
+            delayMs = Math.min(Math.max(d, MIN_DELAY_MS), MAX_DELAY_MS);
+            shouldAdd = true;
+          } else if (elapsedRealMs >= MIN_DELAY_MS) {
+            // Normal capture while loop progresses
+            let d = elapsedRealMs;
+            delayMs = Math.min(Math.max(d, MIN_DELAY_MS), MAX_DELAY_MS);
+            shouldAdd = true;
+          }
+
+          if (shouldAdd) {
+            gifCapturedFrames++;
+            gifLastCaptureRealTime = gifRealTime;
+            gifLastCaptureAnimTime = gifAnimTime;
+
+            if (gifStatus) {
+              gifStatus.textContent =
+                "GIF: recording " + gifCapturedFrames + " frames";
+            }
+
+            gifRecorder.addFrame(captureCanvas, {
+              copy: true,
+              delay: Math.round(delayMs),
+            });
+          }
+
+          if (gifAnimTime >= gifMaxAnimTime) {
+            gifRecording = false;
+            if (gifStatus) gifStatus.textContent = "GIF: rendering...";
+            gifRecorder.render();
+          }
+        }
+
+        // Update debug overlay
+        updateDebugOverlay();
+
+        requestAnimationFrame(render);
+      }
+
+      // ------------------------------
+      // View-mode wiring
+      // ------------------------------
+      async function handleLoadSkeleton(entry) {
+        unloadAllSkeletonsExcept(entry);
+        activeEntry = entry;
+
+        await loadSkeletonEntry(entry);
+        populateDetailView(entry);
+
+        skeletonListView.style.display = "none";
+        skeletonDetailView.style.display = "block";
+      }
+
+      detailBackBtn.addEventListener("click", () => {
+        skeletonDetailView.style.display = "none";
+        skeletonListView.style.display = "block";
+        activeEntry = null;
+      });
+
+      detailReloadBtn.addEventListener("click", async () => {
+        if (!activeEntry) return;
+        await loadSkeletonEntry(activeEntry);
+        populateDetailView(activeEntry);
+      });
+
+      // ------------------------------
+      // Init
+      // ------------------------------
+      buildSkeletonListUI();
+      requestAnimationFrame(render);
+    </script>
+  </body>
+</html>
