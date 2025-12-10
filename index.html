@@ -688,10 +688,31 @@
       // ------------------------------
       // Discover assets
       // ------------------------------
-      (function discoverAssets() {
-        const assetsDir = path.join(__dirname, "assets");
-        const allFiles = fs.readdirSync(assetsDir);
+      let assetsDir = null; // Declare at a higher scope
 
+      (function discoverAssets() {
+        // Try multiple possible locations
+        const possiblePaths = [
+          // path.join(__dirname, "..", "..", "..", "assets"),  // From app.asar one directory above application
+          path.join(__dirname, "..", "..", "assets"),  // From app.asar same directory as application exe, assets folder next to locales and resources folder
+          path.join(__dirname, "assets"),                     // Direct
+          // path.join(process.cwd(), "assets"),                 // From cwd
+        ];
+
+        for (const testPath of possiblePaths) {
+          if (fs.existsSync(testPath)) {
+            assetsDir = testPath; // Store it globally
+            console.log("Found assets at:", assetsDir);
+            break;
+          }
+        }
+
+        if (!assetsDir) {
+          console.error("Could not find assets directory!");
+          return;
+        }
+
+        const allFiles = fs.readdirSync(assetsDir);
         const atlasFiles = allFiles.filter((f) =>
           f.toLowerCase().endsWith(".atlas"),
         );
@@ -717,8 +738,8 @@
           }
           skeletonEntries.push({
             name: s,
-            atlasFile: atlas,
-            skelFile: skel,
+            atlasFile: path.join(assetsDir, atlas),  // Use full path
+            skelFile: path.join(assetsDir, skel),     // Use full path
             loaded: false,
             assetManager: null,
             skeletonData: null,
@@ -1185,17 +1206,23 @@
       // Load skeleton into Spine (with debug listeners)
       // ------------------------------
       async function loadSkeletonEntry(entry) {
-        entry.assetManager = new spine.AssetManager(context, "./assets/");
-        entry.assetManager.loadTextureAtlas(entry.atlasFile);
-        entry.assetManager.loadBinary(entry.skelFile);
+        // Use the actual assets directory, not a relative path
+        entry.assetManager = new spine.AssetManager(context, assetsDir + "/");
+
+        // Use just the filenames since AssetManager will prepend the base path
+        const skelFileName = path.basename(entry.skelFile);
+        const atlasFileName = path.basename(entry.atlasFile);
+
+        entry.assetManager.loadTextureAtlas(atlasFileName);
+        entry.assetManager.loadBinary(skelFileName);
 
         await waitForAssets(entry.assetManager);
 
-        const atlas = entry.assetManager.require(entry.atlasFile);
+        const atlas = entry.assetManager.require(atlasFileName);
         const atlasLoader = new spine.AtlasAttachmentLoader(atlas);
         const binary = new spine.SkeletonBinary(atlasLoader);
         const skeletonData = binary.readSkeletonData(
-          entry.assetManager.require(entry.skelFile),
+          entry.assetManager.require(skelFileName),
         );
 
         entry.skeletonData = skeletonData;

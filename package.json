@@ -5,9 +5,9 @@
 
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --win portable",
+    "build:win": "electron-builder --win zip",
     "build:linux": "electron-builder --linux AppImage",
-    "build:all": "electron-builder -w portable -l AppImage"
+    "build:all": "electron-builder -w zip -l AppImage"
   },
 
   "build": {
@@ -26,7 +26,7 @@
     "win": {
       "target": [
         {
-          "target": "portable",
+          "target": "zip",
           "arch": "x64"
         }
       ],
